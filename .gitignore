@@ -1,1 +1,7 @@
 .idea/
+*.tar
+*.png
+*.JPEG
+*.jpg
+*.json
+*/__pycache__/
