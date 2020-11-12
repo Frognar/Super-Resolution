@@ -27,13 +27,13 @@ class ResidualDenseBlock(torch.nn.Module):
         super().__init__()
         self.__convolution_1 = torch.nn.Conv2d(in_channels=channel, out_channels=growth_channel,
                                                kernel_size=3, padding=1, bias=bias)
-        self.__convolution_2 = torch.nn.Conv2d(in_channels=channel, out_channels=channel + growth_channel,
+        self.__convolution_2 = torch.nn.Conv2d(in_channels=channel + growth_channel, out_channels=growth_channel,
                                                kernel_size=3, padding=1, bias=bias)
-        self.__convolution_3 = torch.nn.Conv2d(in_channels=channel, out_channels=channel + 2 * growth_channel,
+        self.__convolution_3 = torch.nn.Conv2d(in_channels=channel + 2 * growth_channel, out_channels=growth_channel,
                                                kernel_size=3, padding=1, bias=bias)
-        self.__convolution_4 = torch.nn.Conv2d(in_channels=channel, out_channels=channel + 3 * growth_channel,
+        self.__convolution_4 = torch.nn.Conv2d(in_channels=channel + 3 * growth_channel, out_channels=growth_channel,
                                                kernel_size=3, padding=1, bias=bias)
-        self.__convolution_5 = torch.nn.Conv2d(in_channels=channel, out_channels=channel + 4 * growth_channel,
+        self.__convolution_5 = torch.nn.Conv2d(in_channels=channel + 4 * growth_channel, out_channels=channel,
                                                kernel_size=3, padding=1, bias=bias)
         self.__leaky_relu = torch.nn.LeakyReLU(negative_slope=0.2, inplace=True)
 
