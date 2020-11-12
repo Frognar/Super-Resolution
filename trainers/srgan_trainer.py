@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from datasets.datasets import TrainDataset
-from models.srgan import Discriminator, Generator
+from models.models import Discriminator, Generator
 from utils.loss import SRGANPerceptualLoss
 
 
