@@ -87,7 +87,8 @@ class RRDBGenerator(torch.nn.Module):
         self.__convolutional_block = torch.nn.Sequential(
             torch.nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, bias=True),
             torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            torch.nn.Conv2d(in_channels=64, out_channels=3, kernel_size=3, padding=1, bias=True))
+            torch.nn.Conv2d(in_channels=64, out_channels=3, kernel_size=3, padding=1, bias=True),
+            torch.nn.Tanh())
 
     def forward(self, input_data):
         output_data = self.__convolutional_1(input_data)
