@@ -1,6 +1,6 @@
 import torch
 
-from models import blocks
+import models.blocks as blocks
 
 
 class Generator(torch.nn.Module):

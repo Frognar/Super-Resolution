@@ -1,5 +1,5 @@
 from models import RRDBGenerator
-from trainers import SRResNetTrainer
+from trainers.srresnet_trainer import SRResNetTrainer
 
 
 class SRRRDBNetTrainer(SRResNetTrainer):

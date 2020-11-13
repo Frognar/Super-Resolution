@@ -1,7 +1,7 @@
 import torch
 
 from models import RRDBGenerator
-from trainers import SRGANTrainer
+from trainers.srgan_trainer import SRGANTrainer
 from utils import ESRGANPerceptualLoss
 
 
