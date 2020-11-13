@@ -1,9 +1,9 @@
 import torch
 from torch.utils.data import DataLoader
 
-from datasets.datasets import TrainDataset
-from models.models import Discriminator, Generator
-from utils.loss import SRGANPerceptualLoss
+from datasets import TrainDataset
+from models import Discriminator, Generator
+from utils import SRGANPerceptualLoss
 
 
 class SRGANTrainer:
@@ -15,24 +15,45 @@ class SRGANTrainer:
     def _initialize_models(self, train_params):
         self._initialize_generator(train_params)
         self._initialize_discriminator(train_params)
+        self._initialize_optimizers(train_params)
         self._initialize_criteria()
 
     def _initialize_generator(self, train_params):
         self._generator = Generator().cuda().train()
+
+    def _initialize_discriminator(self, train_params):
+        pool_size = self._calculate_pool_size_based_on_crop_size_and_upscale_factor(train_params)
+        self._discriminator = Discriminator(pool_size=pool_size).cuda().train()
+
+    @staticmethod
+    def _calculate_pool_size_based_on_crop_size_and_upscale_factor(train_params):
+        upscale_factor = 4
+        return train_params['crop_size'] // (upscale_factor ** 2)
+
+    def _initialize_optimizers(self, train_params):
+        self._initialize_generator_optimizer(train_params)
+        self._initialize_discriminator_optimizer(train_params)
+
+    def _initialize_generator_optimizer(self, train_params):
         self._g_adam_optimizer = torch.optim.Adam(
             params=filter(lambda p: p.requires_grad, self._generator.parameters()),
             lr=train_params['learning_rate'])
 
-    def _initialize_discriminator(self, train_params):
-        self._discriminator = Discriminator().cuda().train()
+    def _initialize_discriminator_optimizer(self, train_params):
         self._d_adam_optimizer = torch.optim.Adam(
             params=filter(lambda p: p.requires_grad, self._discriminator.parameters()),
             lr=train_params['learning_rate'])
 
     def _initialize_criteria(self):
+        self._initialize_generator_criterion()
+        self._initialize_discriminator_criterion()
+
+    def _initialize_generator_criterion(self):
         self._g_perceptual_loss_criterion = SRGANPerceptualLoss().cuda()
-        self._d_adversarial_loss_criterion = torch.nn.BCELoss().cuda()
         self._last_perceptual_loss = None
+
+    def _initialize_discriminator_criterion(self):
+        self._d_adversarial_loss_criterion = torch.nn.BCELoss().cuda()
         self._last_adversarial_loss = None
 
     def _initialize_data_loader(self, train_params):
@@ -41,8 +62,8 @@ class SRGANTrainer:
         self._data_loader = DataLoader(dataset=dataset, num_workers=train_params['num_workers'],
                                        batch_size=train_params['batch_size'], shuffle=True, pin_memory=True)
 
-    def initialize_with_srresnet(self, srresnet_checkpoint_path):
-        checkpoint = torch.load(srresnet_checkpoint_path)
+    def load_pretrained_generator(self, pretrained_checkpoint_path):
+        checkpoint = torch.load(pretrained_checkpoint_path)
         self._generator.load_state_dict(checkpoint['generator'])
 
     def load(self, checkpoint_path):
@@ -106,10 +127,14 @@ class SRGANTrainer:
 
     def _train_discriminator(self, hr_images, lr_images):
         sr_images = self._generate_sr_images(lr_images).detach()
-        sr_discriminated = self._discriminate_images(sr_images)
-        hr_discriminated = self._discriminate_images(hr_images)
+        sr_discriminated, hr_discriminated = self._discriminate_images_for_discriminator(sr_images, hr_images)
         self._calculate_discriminator_loss(sr_discriminated, hr_discriminated)
         self._update_discriminator()
+
+    def _discriminate_images_for_discriminator(self, sr_images, hr_images):
+        sr_discriminated = self._discriminate_images(sr_images)
+        hr_discriminated = self._discriminate_images(hr_images)
+        return sr_discriminated, hr_discriminated
 
     def _calculate_discriminator_loss(self, sr_discriminated, hr_discriminated):
         sr_loss = self._d_adversarial_loss_criterion(sr_discriminated, torch.zeros_like(sr_discriminated))
@@ -122,12 +147,16 @@ class SRGANTrainer:
         self._d_adam_optimizer.step()
 
     def _save_train_checkpoint(self, epoch):
-        checkpoint = f'./data/checkpoints/srgan_e{epoch + 1}.pth.tar'
+        checkpoint = self._get_save_checkpoint_name(epoch)
         save_dict = {'generator': self._generator.state_dict(), 'g_optimizer': self._g_adam_optimizer.state_dict(),
                      'discriminator': self._discriminator.state_dict(),
                      'd_optimizer': self._d_adam_optimizer.state_dict(),
                      'epoch': epoch + 1}
         torch.save(save_dict, checkpoint)
+
+    @staticmethod
+    def _get_save_checkpoint_name(epoch):
+        return f'./data/checkpoints/srgan_e{epoch + 1}.pth.tar'
 
 
 class SRGANLoggerTrainer(SRGANTrainer):

@@ -1,21 +1,14 @@
-import torch
-from models.models import RRDBGenerator
-from trainers.srresnet_trainer import SRResNetTrainer
+from models import RRDBGenerator
+from trainers import SRResNetTrainer
 
 
 class SRRRDBNetTrainer(SRResNetTrainer):
-    def _initialize_models(self, train_params):
+    def _initialize_generator(self):
         self._generator = RRDBGenerator().cuda().train()
-        self._mse_criterion = torch.nn.MSELoss().cuda()
-        self._adam_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, self._generator.parameters()),
-                                                lr=train_params['learning_rate'])
-        self._last_calculated_loss = None
 
-    def _save_train_checkpoint(self, epoch):
-        checkpoint = f'./data/checkpoints/srrrdbnet_e{epoch + 1}.pth.tar'
-        save_dict = {'generator': self._generator.state_dict(), 'g_optimizer': self._adam_optimizer.state_dict(),
-                     'epoch': epoch + 1}
-        torch.save(save_dict, checkpoint)
+    @staticmethod
+    def _get_save_checkpoint_name(epoch):
+        return f'./data/checkpoints/srrrdbnet_e{epoch + 1}.pth.tar'
 
 
 class SRRRDBNetLoggerTrainer(SRRRDBNetTrainer):

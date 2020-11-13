@@ -1,4 +1,4 @@
-from trainers.srresnet_trainer import SRResNetLoggerTrainer
+from trainers import SRResNetLoggerTrainer
 
 srresnet_params = dict()
 srresnet_params['num_workers'] = 4

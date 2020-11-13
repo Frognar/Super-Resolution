@@ -1,8 +1,8 @@
 import torch
 from torch.utils.data import DataLoader
 
-from datasets.datasets import TrainDataset
-from models.models import Generator
+from datasets import TrainDataset
+from models import Generator
 
 
 class SRResNetTrainer:
@@ -12,10 +12,19 @@ class SRResNetTrainer:
         self._start_epoch = 0
 
     def _initialize_models(self, train_params):
+        self._initialize_generator()
+        self._initialize_optimizer(train_params)
+        self._initialize_criterion()
+
+    def _initialize_generator(self):
         self._generator = Generator().cuda().train()
-        self._mse_criterion = torch.nn.MSELoss().cuda()
+
+    def _initialize_optimizer(self, train_params):
         self._adam_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, self._generator.parameters()),
                                                 lr=train_params['learning_rate'])
+
+    def _initialize_criterion(self):
+        self._mse_criterion = torch.nn.MSELoss().cuda()
         self._last_calculated_loss = None
 
     def _initialize_data_loader(self, train_params):
@@ -57,10 +66,14 @@ class SRResNetTrainer:
         self._adam_optimizer.step()
 
     def _save_train_checkpoint(self, epoch):
-        checkpoint = f'./data/checkpoints/srresnet_e{epoch + 1}.pth.tar'
+        checkpoint = self._get_save_checkpoint_name(epoch)
         save_dict = {'generator': self._generator.state_dict(), 'g_optimizer': self._adam_optimizer.state_dict(),
                      'epoch': epoch + 1}
         torch.save(save_dict, checkpoint)
+
+    @staticmethod
+    def _get_save_checkpoint_name(epoch):
+        return f'./data/checkpoints/srresnet_e{epoch + 1}.pth.tar'
 
 
 class SRResNetLoggerTrainer(SRResNetTrainer):

@@ -1,7 +1,7 @@
 import torch
 from torchvision.transforms import ToPILImage, ToTensor
 
-from models.models import Generator
+from models import Generator
 
 
 class SRResNet:
@@ -17,9 +17,9 @@ class SRResNet:
 
     def generate(self, lr_image):
         with torch.no_grad():
-            lr_image = SRResNet._convert_image_to_tensor(lr_image)
+            lr_image = self._convert_image_to_tensor(lr_image)
             sr_image = self._generator(lr_image)
-            return SRResNet._convert_tensor_to_image(sr_image)
+            return self._convert_tensor_to_image(sr_image)
 
     @classmethod
     def _convert_image_to_tensor(cls, image):

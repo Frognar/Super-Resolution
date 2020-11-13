@@ -1,4 +1,4 @@
-from utils.image_list import ImageListCreator
+from utils import ImageListCreator
 
 if __name__ == '__main__':
     image_list_creator = ImageListCreator(min_size=200)

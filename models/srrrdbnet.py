@@ -1,5 +1,4 @@
-from models.srresnet import SRResNet
-from models.models import RRDBGenerator
+from models import RRDBGenerator, SRResNet
 
 
 class SRRRDBNet(SRResNet):

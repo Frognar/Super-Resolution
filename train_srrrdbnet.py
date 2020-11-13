@@ -1,4 +1,4 @@
-from trainers.srrrdbnet_trainer import SRRRDBNetLoggerTrainer
+from trainers import SRRRDBNetLoggerTrainer
 
 srrrdbnet_params = dict()
 srrrdbnet_params['num_workers'] = 4
