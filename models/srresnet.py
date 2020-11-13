@@ -6,19 +6,19 @@ from models.models import Generator
 
 class SRResNet:
     def __init__(self):
-        self.__initialize_generator()
+        self._initialize_generator()
 
-    def __initialize_generator(self):
-        self.__generator = Generator().cuda().eval()
+    def _initialize_generator(self):
+        self._generator = Generator().cuda().eval()
 
     def load(self, checkpoint):
         checkpoint = torch.load(checkpoint)
-        self.__generator.load_state_dict(checkpoint['generator'])
+        self._generator.load_state_dict(checkpoint['generator'])
 
     def generate(self, lr_image):
         with torch.no_grad():
             lr_image = SRResNet._convert_image_to_tensor(lr_image)
-            sr_image = self.__generator(lr_image)
+            sr_image = self._generator(lr_image)
             return SRResNet._convert_tensor_to_image(sr_image)
 
     @classmethod
