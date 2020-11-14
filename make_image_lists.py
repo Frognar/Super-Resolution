@@ -1,11 +1,36 @@
+import os
+
 from utils import ImageListCreator
 
-if __name__ == '__main__':
+
+def main():
     image_list_creator = ImageListCreator(min_size=200)
-    image_list_creator.create(directory='./data/train/', output_directory='./data/', list_name='train.json')
-    image_list_creator.create(directory='./data/val/', output_directory='./data/', list_name='val.json')
-    image_list_creator.create(directory='./data/test/BSDS100/', output_directory='./data/', list_name='bsds100.json')
-    image_list_creator.create(directory='./data/test/Manga109/', output_directory='./data/', list_name='manga109.json')
-    image_list_creator.create(directory='./data/test/Set5/', output_directory='./data/', list_name='set5.json')
-    image_list_creator.create(directory='./data/test/Set14/', output_directory='./data/', list_name='set14.json')
-    image_list_creator.create(directory='./data/test/Urban100/', output_directory='./data/', list_name='urban100.json')
+    create_train_list(image_list_creator)
+    create_test_lists(image_list_creator)
+
+
+def create_train_list(image_list_creator):
+    create_image_list(image_list_creator, './data/train/', 'train')
+
+
+def create_image_list(image_list_creator, directory, data_set):
+    image_list_creator.create(directory=directory, output_directory='./data/', list_name=f'{data_set}.json')
+
+
+def create_test_lists(image_list_creator):
+    for test_set in os.listdir('./data/test'):
+        create_test_list(image_list_creator, test_set)
+
+
+def create_test_list(image_list_creator, test_set):
+    directory = f'./data/test/{test_set}/'
+    if is_directory(directory):
+        create_image_list(image_list_creator, directory, test_set)
+
+
+def is_directory(directory):
+    return os.path.isdir(directory)
+
+
+if __name__ == '__main__':
+    main()
