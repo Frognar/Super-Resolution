@@ -62,3 +62,7 @@ class SRGANPerceptualLoss(torch.nn.Module):
 class ESRGANPerceptualLoss(SRGANPerceptualLoss):
     def _initialize_feature_extractor(self):
         self._feature_extractor = vgg.TruncatedVGG19BeforeActivation()
+
+    def _initialize_criteria(self):
+        self._content_loss_criterion = torch.nn.L1Loss().cuda()
+        self._adversarial_loss_criterion = torch.nn.BCEWithLogitsLoss().cuda()

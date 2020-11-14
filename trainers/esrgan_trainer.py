@@ -13,6 +13,10 @@ class ESRGANTrainer(SRGANTrainer):
         self._g_perceptual_loss_criterion = ESRGANPerceptualLoss().cuda()
         self._last_perceptual_loss = None
 
+    def _initialize_discriminator_criterion(self):
+        self._d_adversarial_loss_criterion = torch.nn.BCEWithLogitsLoss().cuda()
+        self._last_adversarial_loss = None
+
     def _train_generator(self, hr_images, lr_images):
         sr_images = self._generate_sr_images(lr_images)
         sr_relative_discriminated = self._relatively_discriminate_images(sr_images, hr_images)
@@ -22,14 +26,7 @@ class ESRGANTrainer(SRGANTrainer):
     def _relatively_discriminate_images(self, images, comparison_images):
         discriminated_images = self._discriminate_images(images)
         discriminated_comparison_images = self._discriminate_images(comparison_images).detach()
-        relatively_discriminated_images = discriminated_images - torch.mean(discriminated_comparison_images)
-        return self._normalize_relatively_discriminated_images(relatively_discriminated_images)
-
-    @staticmethod
-    def _normalize_relatively_discriminated_images(relatively_discriminated_images):
-        relatively_discriminated_images = torch.nn.functional.normalize(relatively_discriminated_images)
-        relatively_discriminated_images = (relatively_discriminated_images + 1.) / 2.
-        return relatively_discriminated_images
+        return discriminated_images - discriminated_comparison_images.mean()
 
     def _discriminate_images_for_discriminator(self, sr_images, hr_images):
         sr_discriminated = self._relatively_discriminate_images(sr_images, hr_images)
