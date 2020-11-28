@@ -1,7 +1,6 @@
 import torch
-from torch.utils.data import DataLoader
 
-from datasets import TrainDataset
+from datasets import get_data_loader
 from models import Discriminator, Generator
 from utils import SRGANPerceptualLoss
 
@@ -57,10 +56,13 @@ class SRGANTrainer:
         self._last_adversarial_loss = None
 
     def _initialize_data_loader(self, train_params):
-        dataset = TrainDataset(image_list_path=train_params['images_list'], crop_size=train_params['crop_size'],
-                               upscale_factor=4)
-        self._data_loader = DataLoader(dataset=dataset, num_workers=train_params['num_workers'],
-                                       batch_size=train_params['batch_size'], shuffle=True, pin_memory=True)
+        self._data_loader = get_data_loader(
+            image_list_path=train_params['images_list'],
+            crop_size=train_params['crop_size'],
+            upscale_factor=4,
+            num_workers=train_params['num_workers'],
+            batch_size=train_params['batch_size']
+        )
 
     def load_pretrained_generator(self, pretrained_checkpoint_path):
         checkpoint = torch.load(pretrained_checkpoint_path)

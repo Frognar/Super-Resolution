@@ -1,7 +1,6 @@
 import torch
-from torch.utils.data import DataLoader
 
-from datasets import TrainDataset
+from datasets import get_data_loader
 from models import Generator
 
 
@@ -20,19 +19,23 @@ class SRResNetTrainer:
         self._generator = Generator().cuda().train()
 
     def _initialize_optimizer(self, train_params):
-        self._adam_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, self._generator.parameters()),
-                                                lr=train_params['learning_rate'])
+        self._adam_optimizer = torch.optim.Adam(
+            params=filter(lambda p: p.requires_grad,
+                          self._generator.parameters()),
+            lr=train_params['learning_rate'])
 
     def _initialize_criterion(self):
         self._mse_criterion = torch.nn.MSELoss().cuda()
         self._last_calculated_loss = None
 
     def _initialize_data_loader(self, train_params):
-        dataset = TrainDataset(image_list_path=train_params['images_list'], crop_size=train_params['crop_size'],
-                               upscale_factor=4)
-        self._data_loader = DataLoader(dataset=dataset, num_workers=train_params['num_workers'],
-                                       batch_size=train_params['batch_size'], shuffle=True,
-                                       pin_memory=True)
+        self._data_loader = get_data_loader(
+            image_list_path=train_params['images_list'],
+            crop_size=train_params['crop_size'],
+            upscale_factor=4,
+            num_workers=train_params['num_workers'],
+            batch_size=train_params['batch_size']
+        )
 
     def load(self, checkpoint):
         checkpoint = torch.load(checkpoint)
@@ -67,8 +70,11 @@ class SRResNetTrainer:
 
     def _save_train_checkpoint(self, epoch):
         checkpoint = self._get_save_checkpoint_name(epoch)
-        save_dict = {'generator': self._generator.state_dict(), 'g_optimizer': self._adam_optimizer.state_dict(),
-                     'epoch': epoch + 1}
+        save_dict = {
+            'generator': self._generator.state_dict(),
+            'g_optimizer': self._adam_optimizer.state_dict(),
+            'epoch': epoch + 1
+            }
         torch.save(save_dict, checkpoint)
 
     @staticmethod
@@ -98,4 +104,5 @@ class SRResNetLoggerTrainer(SRResNetTrainer):
 
     def _print_status(self, iteration, epoch):
         loss_avg = sum(self._losses) / len(self._losses)
-        print(f'Epoch: [{epoch + 1}] [{(iteration + 1)}/{len(self._data_loader)}]\tGenerator loss: {loss_avg:.5f}')
+        print(
+            f'Epoch: [{epoch + 1}] [{(iteration + 1)}/{len(self._data_loader)}]\tGenerator loss: {loss_avg:.5f}')
