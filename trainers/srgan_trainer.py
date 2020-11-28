@@ -1,8 +1,8 @@
 import torch
 
 from datasets import get_data_loader
-from models import Discriminator, Generator
-from utils import SRGANPerceptualLoss
+from models import Discriminator, Generator, TruncatedVGG19
+from utils.loss import PerceptualLoss
 
 
 class SRGANTrainer:
@@ -48,7 +48,12 @@ class SRGANTrainer:
         self._initialize_discriminator_criterion()
 
     def _initialize_generator_criterion(self):
-        self._g_perceptual_loss_criterion = SRGANPerceptualLoss().cuda()
+        self._g_perceptual_loss_criterion = PerceptualLoss(
+            vgg=TruncatedVGG19(),
+            content_criterion=torch.nn.MSELoss(),
+            adversarial_criterion=torch.nn.BCELoss()
+        )
+        self._g_perceptual_loss_criterion.move_to_cuda()
         self._last_perceptual_loss = None
 
     def _initialize_discriminator_criterion(self):
@@ -120,7 +125,7 @@ class SRGANTrainer:
         return self._discriminator(images)
 
     def _calculate_generator_loss(self, hr_images, sr_images, sr_discriminated):
-        self._last_perceptual_loss = self._g_perceptual_loss_criterion(sr_discriminated, sr_images, hr_images)
+        self._last_perceptual_loss = self._g_perceptual_loss_criterion.calculate(sr_discriminated, sr_images, hr_images)
 
     def _update_generator(self):
         self._g_adam_optimizer.zero_grad()

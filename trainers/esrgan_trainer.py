@@ -1,8 +1,8 @@
 import torch
 
-from models import RRDBGenerator
+from models import RRDBGenerator, TruncatedVGG19
 from trainers.srgan_trainer import SRGANTrainer
-from utils import ESRGANPerceptualLoss
+from utils.loss import PerceptualLoss
 
 
 class ESRGANTrainer(SRGANTrainer):
@@ -10,7 +10,12 @@ class ESRGANTrainer(SRGANTrainer):
         self._generator = RRDBGenerator().cuda().train()
 
     def _initialize_generator_criterion(self):
-        self._g_perceptual_loss_criterion = ESRGANPerceptualLoss().cuda()
+        self._g_perceptual_loss_criterion = PerceptualLoss(
+            vgg=TruncatedVGG19(with_activation_layer=False),
+            content_criterion=torch.nn.L1Loss(),
+            adversarial_criterion=torch.nn.BCEWithLogitsLoss()
+        )
+        self._g_perceptual_loss_criterion.move_to_cuda()
         self._last_perceptual_loss = None
 
     def _initialize_discriminator_criterion(self):

@@ -1,5 +1,5 @@
 from utils.image_list import ImageListCreator
-from utils.loss import ESRGANPerceptualLoss, SRGANPerceptualLoss
+from utils.loss import PerceptualLoss
 
 
 def get_gan_training_params(crop_size=96):
