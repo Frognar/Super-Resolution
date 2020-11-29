@@ -1,109 +1,120 @@
-import torch
+from torch.nn import AdaptiveAvgPool2d, BatchNorm2d, Conv2d, LeakyReLU, \
+    Linear, Module, PReLU, Sequential, Sigmoid, Tanh
+from torch.nn.functional import interpolate
 
-import models.blocks as blocks
+from models.blocks import ConvolutionalBlock, ResidualBlock, \
+    ResidualInResidualDenseBlock, UpsampleBlock
 
 
-class Generator(torch.nn.Module):
+class Generator(Module):
     def __init__(self):
         super(Generator, self).__init__()
-        self.__convolutional_block_1 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=3, out_channels=64, kernel_size=9, padding=4),
-            torch.nn.PReLU())
+        self.convolutional_block_1 = Sequential(
+            Conv2d(in_channels=3, out_channels=64, kernel_size=9, padding=4),
+            PReLU()
+        )
 
-        self.__residual_block = torch.nn.Sequential(*[blocks.ResidualBlock(channels=64, kernel_size=3)
-                                                      for _ in range(16)])
+        self.residual_block = Sequential(*[ResidualBlock() for _ in range(16)])
+        self.convolutional_block_2 = Sequential(
+            Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
+            BatchNorm2d(num_features=64)
+        )
 
-        self.__convolutional_block_2 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(num_features=64))
-
-        self.__upsample_block = torch.nn.Sequential(
-            blocks.UpsampleBlock(in_channels=64, kernel_size=3, upscale_factor=2),
-            blocks.UpsampleBlock(in_channels=64, kernel_size=3, upscale_factor=2),
-            torch.nn.Conv2d(in_channels=64, out_channels=3, kernel_size=9, padding=4),
-            torch.nn.Tanh())
+        self.upsample_block = Sequential(
+            UpsampleBlock(),
+            UpsampleBlock(),
+            Conv2d(in_channels=64, out_channels=3, kernel_size=9, padding=4),
+            Tanh()
+        )
 
     def forward(self, input_data):
-        output_data = self.__convolutional_block_1(input_data)
+        output_data = self.convolutional_block_1(input_data)
         residual = output_data
-        output_data = self.__residual_block(output_data)
-        output_data = self.__convolutional_block_2(output_data)
+        output_data = self.residual_block(output_data)
+        output_data = self.convolutional_block_2(output_data)
         output_data = output_data + residual
-        return self.__upsample_block(output_data)
+        return self.upsample_block(output_data)
 
 
-class Discriminator(torch.nn.Module):
+class Discriminator(Module):
     def __init__(self, is_pooling_needed=False, pool_size=6):
         super(Discriminator, self).__init__()
-        self.__convolutional_block = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=1),
-            torch.nn.LeakyReLU(negative_slope=0.2),
-            blocks.ConvolutionalBlock(in_channels=64, out_channels=64, kernel_size=3, stride=2),
-            blocks.ConvolutionalBlock(in_channels=64, out_channels=128, kernel_size=3, stride=1),
-            blocks.ConvolutionalBlock(in_channels=128, out_channels=128, kernel_size=3, stride=2),
-            blocks.ConvolutionalBlock(in_channels=128, out_channels=256, kernel_size=3, stride=1),
-            blocks.ConvolutionalBlock(in_channels=256, out_channels=256, kernel_size=3, stride=2),
-            blocks.ConvolutionalBlock(in_channels=256, out_channels=512, kernel_size=3, stride=1),
-            blocks.ConvolutionalBlock(in_channels=512, out_channels=512, kernel_size=3, stride=2))
+        self.convolutional_block = Sequential(
+            Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=1),
+            LeakyReLU(negative_slope=0.2),
+            ConvolutionalBlock(in_channels=64, out_channels=64, stride=2),
+            ConvolutionalBlock(in_channels=64, out_channels=128, stride=1),
+            ConvolutionalBlock(in_channels=128, out_channels=128, stride=2),
+            ConvolutionalBlock(in_channels=128, out_channels=256, stride=1),
+            ConvolutionalBlock(in_channels=256, out_channels=256, stride=2),
+            ConvolutionalBlock(in_channels=256, out_channels=512, stride=1),
+            ConvolutionalBlock(in_channels=512, out_channels=512, stride=2)
+        )
 
-        self.__linear_block = torch.nn.Sequential(
-            torch.nn.Linear(in_features=512 * pool_size * pool_size, out_features=1024),
-            torch.nn.LeakyReLU(negative_slope=0.2),
-            torch.nn.Linear(in_features=1024, out_features=1),
-            torch.nn.Sigmoid())
+        self.linear_block = Sequential(
+            Linear(in_features=512 * pool_size * pool_size, out_features=1024),
+            LeakyReLU(negative_slope=0.2),
+            Linear(in_features=1024, out_features=1),
+            Sigmoid()
+        )
 
-        self.__is_pooling_needed = is_pooling_needed
-        self.__pool_size = pool_size
+        self.is_pooling_needed = is_pooling_needed
+        self.pool_size = pool_size
 
     def forward(self, input_data):
         batch_size = input_data.size(0)
-        output_data = self.__convolutional_block(input_data)
+        output_data = self.convolutional_block(input_data)
 
-        if self.__is_pooling_needed:
-            output_data = self.__normalize_tensor_size(output_data)
+        if self.is_pooling_needed:
+            output_data = self.normalize_tensor_size(output_data)
 
-        return self.__linear_block(output_data.view(batch_size, -1))
+        return self.linear_block(output_data.view(batch_size, -1))
 
-    def __normalize_tensor_size(self, tensor):
-        return torch.nn.AdaptiveAvgPool2d((self.__pool_size, self.__pool_size))(tensor)
+    def normalize_tensor_size(self, tensor):
+        return AdaptiveAvgPool2d((self.pool_size, self.pool_size))(tensor)
 
 
-class RRDBGenerator(torch.nn.Module):
+class RRDBGenerator(Module):
     def __init__(self):
         super().__init__()
-        self.__convolutional_1 = torch.nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=1, bias=True)
+        self.convolutional_1 = Conv2d(
+            in_channels=3,
+            out_channels=64,
+            kernel_size=3,
+            padding=1
+        )
 
-        self.__residual_block = torch.nn.Sequential(
-            *[blocks.ResidualInResidualDenseBlock(channel=64, growth_channel=32) for _ in range(23)],
-            torch.nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, bias=True))
+        self.residual_block = Sequential(
+            *[ResidualInResidualDenseBlock(channel=64, growth_channel=32)
+              for _ in range(23)],
+            Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
+        )
 
-        self.__upscale_block_1 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, bias=True),
-            torch.nn.LeakyReLU(negative_slope=0.2, inplace=True))
+        self.upscale_block_1 = Sequential(
+            Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
+            LeakyReLU(negative_slope=0.2, inplace=True)
+        )
 
-        self.__upscale_block_2 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, bias=True),
-            torch.nn.LeakyReLU(negative_slope=0.2, inplace=True))
+        self.upscale_block_2 = Sequential(
+            Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
+            LeakyReLU(negative_slope=0.2, inplace=True)
+        )
 
-        self.__convolutional_block = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, bias=True),
-            torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            torch.nn.Conv2d(in_channels=64, out_channels=3, kernel_size=3, padding=1, bias=True),
-            torch.nn.Tanh())
+        self.convolutional_block = Sequential(
+            Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
+            LeakyReLU(negative_slope=0.2, inplace=True),
+            Conv2d(in_channels=64, out_channels=3, kernel_size=3, padding=1),
+            Tanh()
+        )
 
     def forward(self, input_data):
-        output_data = self.__convolutional_1(input_data)
-        residual = self.__residual_block(output_data)
+        output_data = self.convolutional_1(input_data)
+        residual = self.residual_block(output_data)
         output_data = output_data + residual
 
-        def upscale(data): return torch.nn.functional.interpolate(data, scale_factor=2, mode='nearest')
+        def upscale(data):
+            return interpolate(data, scale_factor=2, mode='nearest')
 
-        output_data = upscale(output_data)
-        output_data = self.__upscale_block_1(output_data)
-
-        output_data = upscale(output_data)
-        output_data = self.__upscale_block_2(output_data)
-
-        output_data = self.__convolutional_block(output_data)
-
-        return output_data
+        output_data = self.upscale_block_1(upscale(output_data))
+        output_data = self.upscale_block_2(upscale(output_data))
+        return self.convolutional_block(output_data)

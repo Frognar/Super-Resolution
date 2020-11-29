@@ -1,97 +1,113 @@
-import torch
+from torch import cat
+from torch.nn import BatchNorm2d, Conv2d, LeakyReLU, Module, PReLU, \
+    PixelShuffle, Sequential
 
 
-class ResidualBlock(torch.nn.Module):
+class ResidualBlock(Module):
     def __init__(self, channels=64, kernel_size=3):
         super(ResidualBlock, self).__init__()
-
-        self.__convolutional_1 = torch.nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=kernel_size,
-                                                 padding=kernel_size // 2)
-        self.__batch_normalization_1 = torch.nn.BatchNorm2d(num_features=channels)
-        self.__prelu = torch.nn.PReLU()
-        self.__convolutional_2 = torch.nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=kernel_size,
-                                                 padding=kernel_size // 2)
-        self.__batch_normalization_2 = torch.nn.BatchNorm2d(num_features=channels)
+        self.residual_block = Sequential(
+            Conv2d(
+                in_channels=channels,
+                out_channels=channels,
+                kernel_size=kernel_size,
+                padding=kernel_size // 2
+            ),
+            BatchNorm2d(num_features=channels),
+            PReLU(),
+            Conv2d(
+                in_channels=channels,
+                out_channels=channels,
+                kernel_size=kernel_size,
+                padding=kernel_size // 2
+            ),
+            BatchNorm2d(num_features=channels)
+        )
 
     def forward(self, input_data):
-        output_data = self.__convolutional_1(input_data)
-        output_data = self.__batch_normalization_1(output_data)
-        output_data = self.__prelu(output_data)
-        output_data = self.__convolutional_2(output_data)
-        output_data = self.__batch_normalization_2(output_data)
-        return output_data + input_data
+        return input_data + self.residual_block(input_data)
 
 
-class ResidualDenseBlock(torch.nn.Module):
-    def __init__(self, channel=64, growth_channel=32, bias=True):
+class ResidualDenseBlock(Module):
+    def __init__(self, channel=64, growth=32):
         super().__init__()
-        self.__convolution_1 = torch.nn.Conv2d(in_channels=channel, out_channels=growth_channel,
-                                               kernel_size=3, padding=1, bias=bias)
-        self.__convolution_2 = torch.nn.Conv2d(in_channels=channel + growth_channel, out_channels=growth_channel,
-                                               kernel_size=3, padding=1, bias=bias)
-        self.__convolution_3 = torch.nn.Conv2d(in_channels=channel + 2 * growth_channel, out_channels=growth_channel,
-                                               kernel_size=3, padding=1, bias=bias)
-        self.__convolution_4 = torch.nn.Conv2d(in_channels=channel + 3 * growth_channel, out_channels=growth_channel,
-                                               kernel_size=3, padding=1, bias=bias)
-        self.__convolution_5 = torch.nn.Conv2d(in_channels=channel + 4 * growth_channel, out_channels=channel,
-                                               kernel_size=3, padding=1, bias=bias)
-        self.__leaky_relu = torch.nn.LeakyReLU(negative_slope=0.2, inplace=True)
+        self.convolution_1 = self.conv2d(channel, growth, growth, 0)
+        self.convolution_2 = self.conv2d(channel, growth, growth, 1)
+        self.convolution_3 = self.conv2d(channel, growth, growth, 2)
+        self.convolution_4 = self.conv2d(channel, growth, growth, 3)
+        self.convolution_5 = self.conv2d(channel, channel, growth, 4)
+        self.leaky_relu = LeakyReLU(negative_slope=0.2, inplace=True)
+
+    @staticmethod
+    def conv2d(in_channels, out_channels, growth, i):
+        return Conv2d(
+            in_channels=in_channels + i * growth,
+            out_channels=out_channels,
+            kernel_size=3,
+            padding=1
+        )
 
     def forward(self, input_data):
-        out_1 = self.__convolution_1(input_data)
-        out_1 = self.__leaky_relu(out_1)
-        out_2 = self.__convolution_2(torch.cat((input_data, out_1), 1))
-        out_2 = self.__leaky_relu(out_2)
-        out_3 = self.__convolution_3(torch.cat((input_data, out_1, out_2), 1))
-        out_3 = self.__leaky_relu(out_3)
-        out_4 = self.__convolution_4(torch.cat((input_data, out_1, out_2, out_3), 1))
-        out_4 = self.__leaky_relu(out_4)
-        out_5 = self.__convolution_5(torch.cat((input_data, out_1, out_2, out_3, out_4), 1))
-        return input_data + out_5 * 0.2
+        x1 = self.convolution_1(input_data)
+        x1 = self.leaky_relu(x1)
+        x2 = self.convolution_2(cat((input_data, x1), 1))
+        x2 = self.leaky_relu(x2)
+        x3 = self.convolution_3(cat((input_data, x1, x2), 1))
+        x3 = self.leaky_relu(x3)
+        x4 = self.convolution_4(cat((input_data, x1, x2, x3), 1))
+        x4 = self.leaky_relu(x4)
+        x5 = self.convolution_5(cat((input_data, x1, x2, x3, x4), 1))
+        return input_data + x5 * 0.2
 
 
-class ResidualInResidualDenseBlock(torch.nn.Module):
+class ResidualInResidualDenseBlock(Module):
     def __init__(self, channel, growth_channel=32):
         super().__init__()
-        self.__residual_dense_block_1 = ResidualDenseBlock(channel, growth_channel)
-        self.__residual_dense_block_2 = ResidualDenseBlock(channel, growth_channel)
-        self.__residual_dense_block_3 = ResidualDenseBlock(channel, growth_channel)
+        self.residual_dense_block = Sequential(
+            ResidualDenseBlock(channel, growth_channel),
+            ResidualDenseBlock(channel, growth_channel),
+            ResidualDenseBlock(channel, growth_channel)
+        )
 
     def forward(self, input_data):
-        output_data = self.__residual_dense_block_1(input_data)
-        output_data = self.__residual_dense_block_2(output_data)
-        output_data = self.__residual_dense_block_3(output_data)
-        return input_data + output_data * 0.2
+        return input_data + self.residual_dense_block(input_data) * 0.2
 
 
-class UpsampleBlock(torch.nn.Module):
+class UpsampleBlock(Module):
     def __init__(self, in_channels=64, kernel_size=3, upscale_factor=2):
         super(UpsampleBlock, self).__init__()
-        self.__convolutional = torch.nn.Conv2d(in_channels=in_channels,
-                                               out_channels=in_channels * (upscale_factor ** 2),
-                                               kernel_size=kernel_size, padding=kernel_size // 2)
-        self.__pixel_shuffle = torch.nn.PixelShuffle(upscale_factor=upscale_factor)
-        self.__prelu = torch.nn.PReLU()
+
+        self.block = Sequential(
+            Conv2d(
+                in_channels=in_channels,
+                out_channels=in_channels * (upscale_factor ** 2),
+                kernel_size=kernel_size,
+                padding=kernel_size // 2
+            ),
+            PixelShuffle(upscale_factor=upscale_factor),
+            PReLU()
+        )
 
     def forward(self, input_data):
-        output_data = self.__convolutional(input_data)
-        output_data = self.__pixel_shuffle(output_data)
-        output_data = self.__prelu(output_data)
-        return output_data
+        return self.block(input_data)
 
 
-class ConvolutionalBlock(torch.nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, negative_slope=0.2):
+class ConvolutionalBlock(Module):
+    def __init__(self, in_channels, out_channels, stride, kernel_size=3,
+                 negative_slope=0.2):
         super(ConvolutionalBlock, self).__init__()
 
-        self.__convolutional = torch.nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
-                                               kernel_size=kernel_size,
-                                               stride=stride, padding=kernel_size // 2)
-        self.__batch_normalization = torch.nn.BatchNorm2d(num_features=out_channels)
-        self.__leaky_relu = torch.nn.LeakyReLU(negative_slope=negative_slope)
+        self.block = Sequential(
+            Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=kernel_size // 2
+            ),
+            BatchNorm2d(num_features=out_channels),
+            LeakyReLU(negative_slope=negative_slope)
+        )
 
     def forward(self, input_data):
-        output_data = self.__convolutional(input_data)
-        output_data = self.__batch_normalization(output_data)
-        output_data = self.__leaky_relu(output_data)
-        return output_data
+        return self.block(input_data)
