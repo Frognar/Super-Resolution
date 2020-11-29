@@ -1,22 +1,36 @@
-from trainers import SRGANLoggerTrainer
-from utils import get_gan_training_params
+from torch.nn import BCELoss, MSELoss
+
+from datasets import get_data_loader
+from models import Discriminator, Generator, TruncatedVGG19
+from trainers import GANLoggerTrainer
+from utils import PerceptualLoss
+from utils.logger import Logger
 
 
 def main():
-    srgan_params = get_gan_training_params()
-    srgan_trainer = SRGANLoggerTrainer(srgan_params)
-    train_pretrained_model(srgan_trainer)
-    train_model_with_adjusted_learning_rate(srgan_trainer, new_learning_rate=srgan_params['new_learning_rate'])
-
-
-def train_pretrained_model(srgan_trainer):
-    srgan_trainer.load_pretrained_generator(f'./data/checkpoints/srresnet_e{10}.pth.tar')
+    data_loader = get_data_loader()
+    srgan_trainer = GANLoggerTrainer(
+        generator=Generator(),
+        discriminator=Discriminator(),
+        perceptual_criterion=PerceptualLoss(
+            vgg=TruncatedVGG19(),
+            content_criterion=MSELoss(),
+            adversarial_criterion=BCELoss()
+        ),
+        adversarial_criterion=BCELoss(),
+        data_loader=data_loader,
+        learning_rate=1e-4,
+        logger=Logger(
+            print_frequency=508,
+            max_iterations=len(data_loader)
+        )
+    )
+    srgan_trainer.load_pretrained_generator(
+        f'./data/checkpoints/srresnet_e{10}.pth.tar'
+    )
     srgan_trainer.train(epochs=5)
-
-
-def train_model_with_adjusted_learning_rate(srgan_trainer, new_learning_rate):
     srgan_trainer.load(f'./data/checkpoints/srgan_e{5}.pth.tar')
-    srgan_trainer.change_learning_rate(new_learning_rate=new_learning_rate)
+    srgan_trainer.change_learning_rate(new_learning_rate=1e-5)
     srgan_trainer.train(epochs=10)
 
 

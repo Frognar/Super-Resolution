@@ -1,4 +1,3 @@
-from trainers.esrgan_trainer import ESRGANLoggerTrainer, ESRGANTrainer
-from trainers.srgan_trainer import SRGANLoggerTrainer, SRGANTrainer
-from trainers.srresnet_trainer import SRResNetLoggerTrainer, SRResNetTrainer
-from trainers.srrrdbnet_trainer import SRRRDBNetLoggerTrainer, SRRRDBNetTrainer
+from trainers.regan_trainer import ReGANLoggerTrainer, ReGANTrainer
+from trainers.gan_trainer import GANLoggerTrainer, GANTrainer
+from trainers.net_trainer import NetLoggerTrainer, NetTrainer
