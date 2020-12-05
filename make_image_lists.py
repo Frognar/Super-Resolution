@@ -4,7 +4,7 @@ from utils import ImageListCreator
 
 
 def main():
-    image_list_creator = ImageListCreator(min_size=200)
+    image_list_creator = ImageListCreator(min_size=256)
     create_train_list(image_list_creator)
     create_test_lists(image_list_creator)
 
@@ -14,7 +14,11 @@ def create_train_list(image_list_creator):
 
 
 def create_image_list(image_list_creator, directory, data_set):
-    image_list_creator.create(directory=directory, output_directory='./data/', list_name=f'{data_set}.json')
+    image_list_creator.create(
+        directory=directory,
+        output_directory='./data/',
+        list_name=f'{data_set}.json'
+    )
 
 
 def create_test_lists(image_list_creator):

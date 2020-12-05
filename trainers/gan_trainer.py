@@ -1,82 +1,73 @@
 import torch
+from tqdm import tqdm
 
 
 class GANTrainer:
-    def __init__(self, generator, discriminator, perceptual_criterion,
-                 adversarial_criterion, data_loader, learning_rate, name,
-                 on_cuda=True):
-        self.on_cuda = on_cuda
-        self.name = name
+    def __init__(self, g_net, g_criterion, g_optimizer, g_scheduler, d_net,
+                 d_criterion, d_optimizer, d_scheduler, data_loader, device):
+        self.g_net = g_net
+        self.g_criterion = g_criterion
+        self.g_optimizer = g_optimizer
+        self.g_scheduler = g_scheduler
 
-        self.g_net = generator
-        self.d_net = discriminator
-
-        self.perceptual_criterion = perceptual_criterion
-        self.adversarial_criterion = adversarial_criterion
-
-        if self.on_cuda:
-            self.move_to_cuda()
-
-        self.g_optimizer = self.create_optimizer(self.g_net, learning_rate)
-        self.d_optimizer = self.create_optimizer(self.d_net, learning_rate)
+        self.d_net = d_net
+        self.d_criterion = d_criterion
+        self.d_optimizer = d_optimizer
+        self.d_scheduler = d_scheduler
 
         self.data_loader = data_loader
+
+        self.device = device
+
         self.start_epoch = 0
+        self.losses = {
+            'g_loss': list(),
+            'd_loss': list()
+        }
 
-    def move_to_cuda(self):
-        self.g_net = self.g_net.cuda()
-        self.d_net = self.d_net.cuda()
-        self.perceptual_criterion.move_to_cuda()
-        self.adversarial_criterion = self.adversarial_criterion.cuda()
+    def load_pretrained_generator(self, save_path):
+        save = torch.load(save_path)
+        self.g_net.load_state_dict(save['generator'])
 
-    @staticmethod
-    def create_optimizer(model, learning_rate):
-        return torch.optim.Adam(
-            params=filter(lambda p: p.requires_grad, model.parameters()),
-            lr=learning_rate
-        )
+    def load(self, save_path):
+        save = torch.load(save_path)
+        self.load_generator(save)
+        self.load_discriminator(save)
+        self.start_epoch = save['epoch']
 
-    def load_pretrained_generator(self, pretrained_checkpoint_path):
-        checkpoint = torch.load(pretrained_checkpoint_path)
-        self.g_net.load_state_dict(checkpoint['generator'])
+    def load_generator(self, save):
+        self.g_net.load_state_dict(save['generator'])
+        self.g_optimizer.load_state_dict(save['g_optimizer'])
+        self.g_scheduler.load_state_dist(save['g_scheduler'])
 
-    def load(self, checkpoint_path):
-        checkpoint = torch.load(checkpoint_path)
-        self.g_net.load_state_dict(checkpoint['generator'])
-        self.g_optimizer.load_state_dict(checkpoint['g_optimizer'])
-        self.d_net.load_state_dict(checkpoint['discriminator'])
-        self.d_optimizer.load_state_dict(checkpoint['d_optimizer'])
-        self.start_epoch = checkpoint['epoch']
+    def load_discriminator(self, save):
+        self.d_net.load_state_dict(save['discriminator'])
+        self.d_optimizer.load_state_dict(save['d_optimizer'])
+        self.d_scheduler.load_state_dist(save['d_scheduler'])
 
-    def change_learning_rate(self, new_learning_rate):
-        self.set_new_learning_rate(self.g_optimizer, new_learning_rate)
-        self.set_new_learning_rate(self.d_optimizer, new_learning_rate)
+    def train(self, max_epochs=20, save_path=None):
+        for epoch in range(self.start_epoch, max_epochs):
+            self.process_epoch(epoch, max_epochs)
+            self.schedule_learning_rate()
 
-    @staticmethod
-    def set_new_learning_rate(optimizer, new_learning_rate):
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = new_learning_rate
+            if save_path is not None:
+                self.save(epoch, save_path)
 
-    def train(self, epochs=10):
-        for epoch in range(self.start_epoch, epochs):
-            self.process_epoch(epoch)
+    def process_epoch(self, epoch, max_epochs):
+        loop = tqdm(self.data_loader)
+        for hr_images, lr_images in loop:
+            hr_images = hr_images.to(self.device)
+            lr_images = lr_images.to(self.device)
 
-    def process_epoch(self, epoch):
-        for real, lr_real in self.data_loader:
-            if self.on_cuda:
-                real, lr_real = real.cuda(), lr_real.cuda()
-            self.process_iteration(real, lr_real)
-        self.save(epoch)
+            self.train_generator(hr_images, lr_images)
+            self.train_discriminator(hr_images, lr_images)
+            self.decorate_print(loop, epoch, max_epochs)
 
-    def process_iteration(self, real, lr_real):
-        self.train_generator(real, lr_real)
-        self.train_discriminator(real, lr_real)
-
-    def train_generator(self, real, lr_real):
-        generated = self.generate(lr_real)
-        labels = self.discriminate(generated)
-        loss = self.calculate_generator_loss(real, generated, labels)
-        self.update_generator(loss)
+    def train_generator(self, hr_images, lr_images):
+        sr_images = self.generate(lr_images)
+        labels = self.discriminate(sr_images)
+        loss = self.calculate_generator_loss(sr_images, hr_images, labels)
+        self.optimize_generator(loss)
 
     def generate(self, lr_images):
         return self.g_net(lr_images)
@@ -84,78 +75,65 @@ class GANTrainer:
     def discriminate(self, *images):
         return self.d_net(*images)
 
-    def calculate_generator_loss(self, real, generated, labels):
-        return self.perceptual_criterion.calculate(labels, generated, real)
+    def calculate_generator_loss(self, sr_images, hr_images, labels):
+        loss = self.g_criterion(sr_images, hr_images, labels)
+        self.losses['g_loss'].append(loss.item())
+        return loss
 
-    def update_generator(self, loss):
+    def optimize_generator(self, loss):
         self.g_optimizer.zero_grad()
         loss.backward()
         self.g_optimizer.step()
 
-    def train_discriminator(self, real, lr_real):
-        generated = self.generate(lr_real).detach()
-        generated_labels = self.discriminate(generated)
-        real_labels = self.discriminate(real)
-        loss = self.calculate_discriminator_loss(generated_labels, real_labels)
-        self.update_discriminator(loss)
+    def train_discriminator(self, hr_images, lr_images):
+        sr_images = self.generate(lr_images).detach()
+        sr_labels = self.discriminate(sr_images)
+        hr_labels = self.discriminate(hr_images)
+        loss = self.calculate_discriminator_loss(sr_labels, hr_labels)
+        self.optimize_discriminator(loss)
 
-    def calculate_discriminator_loss(self, generated_labels, real_labels):
-        sr_loss = self.adversarial_criterion(
-            generated_labels,
-            torch.zeros_like(generated_labels)
-        )
-        hr_loss = self.adversarial_criterion(
-            real_labels,
-            torch.ones_like(real_labels)
-        )
-        return sr_loss + hr_loss
+    def calculate_discriminator_loss(self, sr_labels, hr_labels):
+        loss = self.d_criterion(sr_labels, hr_labels)
+        self.losses['d_loss'].append(loss.item())
+        return loss
 
-    def update_discriminator(self, loss):
+    def optimize_discriminator(self, loss):
         self.d_optimizer.zero_grad()
         loss.backward()
         self.d_optimizer.step()
 
-    def save(self, epoch):
-        save_dict = {
-            'generator': self.g_net.state_dict(),
-            'g_optimizer': self.g_optimizer.state_dict(),
-            'discriminator': self.d_net.state_dict(),
-            'd_optimizer': self.d_optimizer.state_dict(),
-            'epoch': epoch + 1
+    def decorate_print(self, loop, epoch, max_epochs):
+        loop.set_description(f'Epoch [{epoch + 1} / {max_epochs}]')
+        mean_g_loss, mean_d_loss = self.calculate_mean_losses()
+        loop.set_postfix(g_loss=mean_g_loss, d_loss=mean_d_loss)
+
+    def calculate_mean_losses(self):
+        mean_g_loss = sum(self.losses['g_loss']) / len(self.losses['g_loss'])
+        mean_d_loss = sum(self.losses['d_loss']) / len(self.losses['d_loss'])
+        return mean_g_loss, mean_d_loss
+
+    def schedule_learning_rate(self):
+        mean_g_loss, mean_d_loss = self.calculate_mean_losses()
+        self.g_scheduler.step(mean_g_loss)
+        self.d_scheduler.step(mean_d_loss)
+        self.losses = {
+            'g_loss': list(),
+            'd_loss': list()
         }
-        torch.save(
-            save_dict,
-            f'./data/checkpoints/{self.name}_e{epoch + 1}.pth.tar'
-        )
 
+    def save(self, epoch, save_path):
+        save = dict()
+        self.save_generator(save)
+        self.save_discriminator(save)
+        save['epoch'] = epoch + 1
+        torch.save(save, save_path)
 
-class GANLoggerTrainer(GANTrainer):
-    def __init__(self, generator, discriminator, perceptual_criterion,
-                 adversarial_criterion, data_loader, learning_rate,
-                 logger, on_cuda=True):
-        super().__init__(generator, discriminator, perceptual_criterion,
-                         adversarial_criterion, data_loader, learning_rate,
-                         on_cuda)
-        self.logger = logger
-        self.last_losses = dict()
+    def save_generator(self, save):
+        save['generator'] = self.g_net.state_dict()
+        save['g_optimizer'] = self.g_optimizer.state_dict()
+        save['g_scheduler'] = self.g_scheduler.state_dict()
 
-    def process_epoch(self, epoch):
-        self.logger.reset(epoch + 1)
-        super().process_epoch(epoch)
-
-    def process_iteration(self, real, lr_real):
-        super().process_iteration(real, lr_real)
-        self.logger.update(**self.last_losses)
-
-    def calculate_generator_loss(self, real, generated, labels):
-        g_loss = super().calculate_generator_loss(real, generated, labels)
-        self.last_losses['Generator'] = g_loss.item()
-        return g_loss
-
-    def calculate_discriminator_loss(self, generated_labels, real_labels):
-        d_loss = super().calculate_discriminator_loss(
-            generated_labels,
-            real_labels
-        )
-        self.last_losses['Discriminator'] = d_loss.item()
-        return d_loss
+    def save_discriminator(self, save):
+        save['discriminator'] = self.d_net.state_dict()
+        save['d_optimizer'] = self.d_optimizer.state_dict()
+        save['d_scheduler'] = self.d_scheduler.state_dict()

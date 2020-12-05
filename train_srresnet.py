@@ -1,26 +1,55 @@
+import torch
 from torch.nn import MSELoss
+from torch.optim import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import DataLoader
 
-from datasets import get_data_loader
-from models import Generator
-from trainers import NetLoggerTrainer
-from utils.logger import Logger
+from dataset import ImageNetDataset
+from nn.model import Generator
+from trainers import NetTrainer
+from utils import Converter
 
 
 def main():
-    data_loader = get_data_loader()
-    srresnet_trainer = NetLoggerTrainer(
-        generator=Generator(),
-        criterion=MSELoss(),
-        data_loader=data_loader,
-        learning_rate=1e-4,
-        name='srresnet',
-        logger=Logger(
-            print_frequency=508,
-            max_iterations=len(data_loader)
-        ),
-        on_cuda=True
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    net = Generator().to(device)
+    criteria = MSELoss().to(device)
+    optimizer = Adam(
+        params=filter(lambda p: p.requires_grad, net.parameters()),
+        lr=1e-4
     )
-    srresnet_trainer.train(epochs=10)
+    scheduler = ReduceLROnPlateau(
+        optimizer=optimizer,
+        patience=3,
+        factor=0.5,
+        verbose=True
+    )
+
+    dataset = ImageNetDataset(
+        json_path='data/train.json',
+        converter=Converter()
+    )
+    data_loader = DataLoader(
+        dataset=dataset,
+        batch_size=16,
+        num_workers=4,
+        pin_memory=True,
+        shuffle=True
+    )
+
+    trainer = NetTrainer(
+        net=net,
+        criterion=criteria,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        data_loader=data_loader,
+        device=device
+    )
+    trainer.train(
+        max_epochs=5,
+        save_path='data/checkpoints/SRResNet.pth.tar'
+    )
 
 
 if __name__ == '__main__':

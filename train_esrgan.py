@@ -1,37 +1,79 @@
+import torch
 from torch.nn import BCEWithLogitsLoss, L1Loss
+from torch.optim import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import DataLoader
 
-from datasets import get_data_loader
-from models import Discriminator, RRDBGenerator, TruncatedVGG19
-from trainers import ReGANLoggerTrainer
-from utils import PerceptualLoss
-from utils.logger import Logger
+from dataset import ImageNetDataset
+from nn.feature_extractor import TruncatedVgg
+from nn.loss import DiscriminatorLoss, PerceptualLoss
+from nn.model import DenseGenerator, Discriminator
+from trainers import ReGANTrainer
+from utils import Converter
 
 
 def main():
-    data_loader = get_data_loader(crop_size=128)
-    esrgan_trainer = ReGANLoggerTrainer(
-        generator=RRDBGenerator(),
-        discriminator=Discriminator(pool_size=8),
-        perceptual_criterion=PerceptualLoss(
-            vgg=TruncatedVGG19(with_activation_layer=False),
-            content_criterion=L1Loss(),
-            adversarial_criterion=BCEWithLogitsLoss()
-        ),
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    g_net = DenseGenerator().to(device)
+    g_criterion = PerceptualLoss(
+        feature_extractor=TruncatedVgg(with_activation_layer=False),
+        content_criterion=L1Loss(),
         adversarial_criterion=BCEWithLogitsLoss(),
+    ).to(device)
+    g_optimizer = Adam(
+        params=filter(lambda p: p.requires_grad, g_net.parameters()),
+        lr=1e-4
+    )
+    g_scheduler = ReduceLROnPlateau(
+        optimizer=g_optimizer,
+        factor=0.5,
+        patience=3,
+        verbose=True
+    )
+
+    d_net = Discriminator().to(device)
+    d_criterion = DiscriminatorLoss(criterion=BCEWithLogitsLoss()).to(device)
+    d_optimizer = Adam(
+        params=filter(lambda p: p.requires_grad, d_net.parameters()),
+        lr=1e-4
+    )
+    d_scheduler = ReduceLROnPlateau(
+        optimizer=d_optimizer,
+        factor=0.5,
+        patience=3,
+        verbose=True
+    )
+
+    converter = Converter()
+    dataset = ImageNetDataset(
+        json_path='data/train.json',
+        converter=converter
+    )
+    data_loader = DataLoader(
+        dataset=dataset,
+        batch_size=4,
+        num_workers=4,
+        pin_memory=True,
+        shuffle=True
+    )
+
+    trainer = ReGANTrainer(
+        g_net=g_net,
+        g_criterion=g_criterion,
+        g_optimizer=g_optimizer,
+        g_scheduler=g_scheduler,
+        d_net=d_net,
+        d_criterion=d_criterion,
+        d_optimizer=d_optimizer,
+        d_scheduler=d_scheduler,
         data_loader=data_loader,
-        learning_rate=1e-4,
-        logger=Logger(
-            print_frequency=508,
-            max_iterations=len(data_loader)
-        )
+        device=device
     )
-    esrgan_trainer.load_pretrained_generator(
-        f'./data/checkpoints/srrrdbnet_e{10}.pth.tar'
+    trainer.train(
+        max_epochs=5,
+        save_path='data/checkpoints/ESRGAN.pth.tar'
     )
-    esrgan_trainer.train(epochs=5)
-    esrgan_trainer.load(f'./data/checkpoints/esrgan_e{5}.pth.tar')
-    esrgan_trainer.change_learning_rate(new_learning_rate=1e-5)
-    esrgan_trainer.train(epochs=10)
 
 
 if __name__ == '__main__':

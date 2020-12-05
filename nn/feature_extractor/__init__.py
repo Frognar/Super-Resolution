@@ -1,0 +1,1 @@
+from nn.feature_extractor.truncated_vgg import TruncatedVgg

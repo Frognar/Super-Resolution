@@ -1,14 +1,15 @@
-import torch
-import torchvision
+import torch.nn as nn
+import torchvision.models as models
 
 
-class TruncatedVGG19(torch.nn.Module):
+class TruncatedVgg(nn.Module):
     def __init__(self, with_activation_layer=True):
-        super(TruncatedVGG19, self).__init__()
-        vgg19 = torchvision.models.vgg19(pretrained=True)
+        super().__init__()
 
+        vgg19 = models.vgg19(pretrained=True)
         layers = 36 if with_activation_layer else 35
-        self.net = torch.nn.Sequential(
+
+        self.net = nn.Sequential(
             *list(vgg19.features.children())[:layers]
         ).eval()
 
