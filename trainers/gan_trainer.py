@@ -38,12 +38,12 @@ class GANTrainer:
     def load_generator(self, save):
         self.g_net.load_state_dict(save['generator'])
         self.g_optimizer.load_state_dict(save['g_optimizer'])
-        self.g_scheduler.load_state_dist(save['g_scheduler'])
+        self.g_scheduler.load_state_dict(save['g_scheduler'])
 
     def load_discriminator(self, save):
         self.d_net.load_state_dict(save['discriminator'])
         self.d_optimizer.load_state_dict(save['d_optimizer'])
-        self.d_scheduler.load_state_dist(save['d_scheduler'])
+        self.d_scheduler.load_state_dict(save['d_scheduler'])
 
     def train(self, max_epochs=20, save_path=None):
         for epoch in range(self.start_epoch, max_epochs):
