@@ -1,3 +1,4 @@
+import PIL
 from torchvision.transforms import Normalize, RandomCrop, Resize, ToTensor
 
 
@@ -10,7 +11,7 @@ class Converter:
             std = [0.0301, 0.0310, 0.0261]
 
         self.random_crop = RandomCrop(crop_size)
-        self.resize = Resize(crop_size // upscale_factor)
+        self.resize = Resize(crop_size // upscale_factor, PIL.Image.BICUBIC)
         self.convert = ToTensor()
         self.normalize = Normalize(mean, std)
 
