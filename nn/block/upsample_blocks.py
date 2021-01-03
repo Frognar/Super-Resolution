@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch.nn.functional import interpolate
 
 
 class PixelShuffleUpscaleBlock(nn.Module):
@@ -6,12 +7,9 @@ class PixelShuffleUpscaleBlock(nn.Module):
         super().__init__()
 
         self.block = nn.Sequential(
-            nn.Conv2d(
-                in_channels=in_channels,
-                out_channels=in_channels * (upscale_factor ** 2),
-                kernel_size=kernel_size,
-                padding=kernel_size // 2
-            ),
+            nn.Conv2d(in_channels=in_channels,
+                      out_channels=in_channels * (upscale_factor ** 2),
+                      kernel_size=kernel_size, padding=kernel_size // 2),
             nn.PixelShuffle(upscale_factor=upscale_factor),
             nn.PReLU()
         )
@@ -25,12 +23,8 @@ class UpscaleBlock(nn.Module):
         super().__init__()
         self.scale_factor = upscale_factor
         self.block = nn.Sequential(
-            nn.Conv2d(
-                in_channels=channels,
-                out_channels=channels,
-                kernel_size=kernel_size,
-                padding=kernel_size // 2
-            ),
+            nn.Conv2d(in_channels=channels, out_channels=channels,
+                      kernel_size=kernel_size, padding=kernel_size // 2),
             nn.LeakyReLU(negative_slope=0.2, inplace=True)
         )
 
@@ -38,8 +32,4 @@ class UpscaleBlock(nn.Module):
         return self.block(self.upscale(input_data))
 
     def upscale(self, data):
-        return nn.functional.interpolate(
-            data,
-            scale_factor=self.scale_factor,
-            mode='nearest'
-        )
+        return interpolate(data, scale_factor=self.scale_factor, mode='nearest')

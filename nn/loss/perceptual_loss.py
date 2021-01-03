@@ -3,8 +3,7 @@ import torch.nn as nn
 
 
 class PerceptualLoss(nn.Module):
-    def __init__(self, feature_extractor, content_criterion,
-                 adversarial_criterion):
+    def __init__(self, feature_extractor, content_criterion, adversarial_criterion):
         super().__init__()
         self.feature_extractor = feature_extractor
         self.content_criterion = content_criterion

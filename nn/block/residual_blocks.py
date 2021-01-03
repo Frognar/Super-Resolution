@@ -6,20 +6,12 @@ class ResidualBlock(nn.Module):
     def __init__(self, channels=64, kernel_size=3):
         super().__init__()
         self.block = nn.Sequential(
-            nn.Conv2d(
-                in_channels=channels,
-                out_channels=channels,
-                kernel_size=kernel_size,
-                padding=kernel_size // 2
-            ),
+            nn.Conv2d(in_channels=channels, out_channels=channels,
+                      kernel_size=kernel_size, padding=kernel_size // 2),
             nn.BatchNorm2d(num_features=channels),
             nn.PReLU(),
-            nn.Conv2d(
-                in_channels=channels,
-                out_channels=channels,
-                kernel_size=kernel_size,
-                padding=kernel_size // 2
-            ),
+            nn.Conv2d(in_channels=channels, out_channels=channels,
+                      kernel_size=kernel_size, padding=kernel_size // 2),
             nn.BatchNorm2d(num_features=channels)
         )
 
@@ -39,12 +31,9 @@ class ResidualDenseBlock(nn.Module):
 
     @staticmethod
     def conv2d(in_channels, out_channels, kernel_size, growth, factor):
-        return nn.Conv2d(
-            in_channels=in_channels + factor * growth,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            padding=kernel_size // 2
-        )
+        return nn.Conv2d(in_channels=in_channels + factor * growth,
+                         out_channels=out_channels, kernel_size=kernel_size,
+                         padding=kernel_size // 2)
 
     def forward(self, input_data):
         x1 = self.relu(self.conv2d_1(input_data))

@@ -3,8 +3,7 @@ from tqdm import tqdm
 
 
 class NetTrainer:
-    def __init__(self, net, criterion, optimizer, scheduler, data_loader,
-                 device):
+    def __init__(self, net, criterion, optimizer, scheduler, data_loader, device):
         self.net = net
         self.criterion = criterion
         self.optimizer = optimizer

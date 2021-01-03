@@ -8,12 +8,7 @@ class Discriminator(nn.Module):
         super().__init__()
 
         self.convolutional_block = nn.Sequential(
-            nn.Conv2d(
-                in_channels=3,
-                out_channels=64,
-                kernel_size=3,
-                padding=1
-            ),
+            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=1),
             nn.LeakyReLU(negative_slope=0.2),
             ConvolutionalBlock(in_channels=64, out_channels=64, stride=2),
             ConvolutionalBlock(in_channels=64, out_channels=128, stride=1),

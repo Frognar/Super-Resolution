@@ -11,11 +11,8 @@ class ImageListCreator:
 
     def create(self, directory, output_directory, list_name):
         image_list = self.get_images_from(directory)
-        ImageListCreator.save_list(
-            image_list=image_list,
-            list_name=list_name,
-            output_directory=output_directory
-        )
+        ImageListCreator.save_list(image_list=image_list, list_name=list_name,
+                                   output_directory=output_directory)
 
     def get_images_from(self, directory):
         files = os.listdir(directory)

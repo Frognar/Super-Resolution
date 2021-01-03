@@ -7,13 +7,8 @@ class ConvolutionalBlock(nn.Module):
         super().__init__()
 
         self.block = nn.Sequential(
-            nn.Conv2d(
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=kernel_size,
-                stride=stride,
-                padding=kernel_size // 2
-            ),
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
+                      kernel_size=kernel_size, stride=stride, padding=kernel_size // 2),
             nn.BatchNorm2d(num_features=out_channels),
             nn.LeakyReLU(negative_slope=negative_slope)
         )

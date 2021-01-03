@@ -32,9 +32,11 @@ def main():
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("path", help="Path to LR image", type=str)
-    parser.add_argument("model", help="SRGAN or ESRGAN", type=str.lower, choices=['srgan', 'esrgan'])
+    parser.add_argument("model", help="SRGAN or ESRGAN", type=str.lower,
+                        choices=['srgan', 'esrgan'])
     parser.add_argument("-w", "--weights", help="path to saved model", type=str)
-    parser.add_argument("-c", "--cuda", help="Use CUDA [True]", type=str2bool, default=True)
+    parser.add_argument("-c", "--cuda", help="Use CUDA? [True]", type=str2bool,
+                        default=True)
     parser.add_argument("-o", "--out", help="Path to save SR image", type=str)
     return parser.parse_args()
 
