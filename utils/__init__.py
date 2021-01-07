@@ -6,13 +6,14 @@ from utils.converter import Converter
 
 def parse_training_args(model_name):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", "--e", type=int, default=5,
+    parser.add_argument("--epochs", "-e", type=int, default=5,
                         help="Number of training epochs")
-    parser.add_argument("--load", "--l", type=str,
+    parser.add_argument("--load", "-l", type=str,
                         help="Path to .pth.tar file with trained model")
-    parser.add_argument("--init", "--i", type=str,
-                        help="Path to .pth.tar file with pretrained model")
-    parser.add_argument("--out", "--o", type=str,
+    if "SRGAN" in model_name:
+        parser.add_argument("--init", "-i", type=str,
+                            help="Path to .pth.tar file with pretrained model")
+    parser.add_argument("--out", "-o", type=str,
                         default=f"data/checkpoints/{model_name}.pth.tar",
                         help=f"Path to save trained model"
                              f" [data/checkpoints/{model_name}.pth.tar]")
